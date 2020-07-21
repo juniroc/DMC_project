@@ -1,0 +1,1048 @@
+---
+title: "R 3rd Team Project Final"
+author: "Jihyun Kim"
+date: '2020 7 21 '
+output: html_document
+code_folding: hide
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include=FALSE}
+hooks = knitr::knit_hooks$get()
+hook_foldable = function(type) {
+  force(type)
+  function(x, options) {
+    res = hooks[[type]](x, options)
+    
+    if (isFALSE(options[[paste0("fold.", type)]])) return(res)
+    
+    paste0(
+      "<details><summary>", type, "</summary>\n\n",
+      res,
+      "\n\n</details>"
+    )
+  }
+}
+knitr::knit_hooks$set(
+  output = hook_foldable("output"),
+  plot = hook_foldable("plot")
+)
+```
+
+### __A반 이수빈 김지현 양지원 이민준__
+
+<br/>
+
+--------------
+
+
+### __1. Introduction__ 
+
+#### __1) Raw Data__  
+##### __1)-1 데이터 기본정보__
+```{r}
+# 데이터 불러오기 
+path <- 'C:\\Users\\LENOVO\\Desktop\\팀플 2차\\Employee_attribute.csv'
+HR <- read.csv(path,stringsAsFactors = T, header=T)
+head(HR)
+```
+- IBM의 데이터과학자가 작성한 가상의 HR(인사)데이터 세트  
+- 1471개 행과 34개의 열로 구성  
+
+##### __1)-2 열에 대한 설명__
+
+|Index|설명|
+|---|---|
+|Age|나이|
+|Attrition|퇴직여부|
+|BusinessTravel|출장빈도|
+|DailyRate|일당 근무 비율|
+|Department|부서|
+|DistanceFromHome|집과의거리|
+|Education|교육정도|
+|EducationField|전공|
+|EmployeeNumber|사번|
+|EnvironmentSatisfaction|근무환경만족도|
+|Gender|성별|
+|HourlyRate|시급|
+|JobInvolvement|직업기여도|
+|JobLevel|직위|
+|JobRole|직무|
+|JobSatisfaction|직업만족도|
+|MaritalStatus|결혼상태|
+|MonthlyIncome|월급|
+|MonthlyRate|총소득|
+|NumCompaniesWorked|이전직장수|
+|OverTime|초과근무시간|
+|PercentSalaryHike|파업정도|
+|PerformanceRating|성과비율|
+|RelationshipSatisfaction|관계만족도|
+|StandardHours|정규근무시간|
+|StockOptionLevel|주식매수선택권정도|
+|TotalWorkingYears|근속년수|
+|TrainingTimesLastYear|작년교육시간|
+|WorkLifeBalance|일-삶 균형정도|
+|YearsAtCompany|경력년수|
+|YearsInCurrentRole|현진무근속년수| 
+|YearsSinceLastPromotion|작년공채이후년도|
+|YearsWithCurrManager|현매니저와 근속년수|
+
+##### __1)-3 구조확인__
+
+```{r}
+str(HR)
+
+#output: 9개의 Factor형 변수와 35개의 숫자형 변수로 구성 
+```
+결론: __1)-4 35개 문항에 대한 1,470명의 정보__
+
+
+##### __1)-5 결측치확인__
+```{r}
+sum(is.na(data))
+
+#결과: 결측치는 없는것으로 확인되었다
+```
+
+
+##### __1)-6 사용하지 않을 열은 삭제 __
+```{r}
+
+library(dplyr)
+HR <- HR[ ,!(colnames(HR) %in% c("Over18","EmployeeNumber","EmployeeCount","StandardHours"))] 
+```
+
+<br/>
+
+##### __2) 데이터 시각화를 통한 파악 __
+
+##### __2)-1 본격적 시각화를 시작하기 전, 변수들 간의 상관관계를 파악__
+
+```{r}
+#상관계수를 구하기 위해 수치형변수들로 전환
+
+HR <- HR %>% mutate_if(is.factor, as.numeric)
+
+```
+
+```{r}
+#전체상관계수 시각화
+
+library(ggcorrplot)
+x <- cor(HR)
+ggcorrplot(x)
+```
+
+
+
+```{r}
+
+#상관계수 높은 것 들끼리만 나열(표형식) 및 시각화
+
+corr_simple <- function(data=HR,sig=0.5)
+
+
+library(corrplot)
+corr <- cor(HR)
+corr[lower.tri(corr, diag = T)] <- NA
+corr[corr == 1] <- NA
+corr <- as.data.frame(as.table(corr))
+corr<- na.omit(corr)
+corr <- subset(corr, abs(Freq) > 0.5)
+corr <- corr[order(-abs(corr$Freq)),]
+
+print(corr)
+
+  #turn corr back into matrix in order to plot with corrplot
+mtx_corr <- reshape2::acast(corr, Var1~Var2, value.var="Freq")
+  
+  #plot correlations visually
+#corrplot(mtx_corr, is.corr=FALSE, tl.col="black", na.label=" ")
+ggcorrplot(mtx_corr)
+corr_simple()
+```
+
+위의 상관계수 분석을 바탕으로 상관계수가 높은 변수들끼리의 시각화 및 기본적인 정보에 대한 시각화를 통해 데이터를 보이겠다. 
+
+```{r}
+#명목형변수를 다시 도식화로 보이기 위해서 파일 재호츌
+HR <- read.csv(path, header=T)
+```
+
+##### __2)-2 기본적 정보에 대한 시각화 __
+##### __퇴사율( Attrition)__
+
+- 총 퇴사율
+```{r}
+barplot(prop.table(table(HR$Attrition)), 
+        col = "blue",
+        xlab="Attrition", 
+        ylab="rate", 
+        main="Attrition Rate(total)")
+```
+```
+퇴사율은 약 20%로 집계되었다
+```
+
+
+
+- 부서에 따른 퇴사율
+```{r}
+
+barplot(prop.table(table(HR$Attrition, HR$Department)), 
+        col =rainbow(2),
+        xlab = "Department", 
+        ylab = "Attrition", 
+        main = "Attrition Rate(by Department)", 
+        legend="no")
+```
+```
+퇴사율이 가장 높은 부서는 R&D부서이다 
+
+```
+
+##### __성별(Gender)에 따른 임금차이 __
+
+```{r}
+
+ggplot(data=HR,aes(x=Gender,y= MonthlyRate))+geom_boxplot()+ 
+scale_fill_manual(values=c("#F5A9F2", "#5882FA")) + scale_color_manual(values=c("#FE2EF7", "#5858FA"))+labs(title="Gender Disparities in Income")
+
+```
+```
+- 성별(남/여)간의 임금 격차는 크지 않다. 
+- 여성의 평균 임금이 근소하게 남성 평균 임금보다 높다. 
+
+```
+
+##### __부서별 성별 비율__
+
+
+```{r}
+barplot(prop.table(table(HR$Gender, HR$Department)), 
+        col = c("blue","red"),
+        xlab = "Department", 
+        ylab = "rate by gender", 
+        main = "Department - Gender(rate)")
+legend("topright", legend = c("여자","남자"), fill = c('blue','red'))
+```
+
+```
+- 총 사원은 R&D부서가 제일 많으며 남녀비율은 대체로 비슷하다
+- R&D부서가 유독 여자 사원에 비해 남자사원이 근소하게 많은 비중을 차지한다
+
+```
+
+
+##### __학력별 직무만족도__
+```{r}
+boxplot(JobSatisfaction ~ Education, data=HR , col=rainbow(5), main="Job Satisfacion by Education level")
+```
+
+```
+
+박사학위자의 직무만족도의 분포가 유난히 큰 것으로 드러남
+
+```
+
+
+
+##### __2. 데이터 전처리__
+```{r}
+HR<-read.csv(path, stringsAsFactors = T)
+HR$Attrition<-as.numeric(HR$Attrition)
+HR$BusinessTravel <- as.numeric(HR$BusinessTravel)
+HR$Department <- as.numeric(HR$Department)
+HR$EducationField <-as.numeric(HR$EducationField)
+HR$EnvironmentSatisfaction <- as.numeric(HR$EnvironmentSatisfaction)
+HR$Gender <- as.numeric(HR$Gender)
+HR$JobRole <- as.numeric(HR$JobRole)
+HR$MaritalStatus <- as.numeric(HR$MaritalStatus)
+HR$Over18 <- as.numeric(HR$Over18)
+HR$OverTime <- as.numeric(HR$OverTime)
+str(HR)
+```
+character 변수를 numeric형으로 변환하였다.
+
+
+<br/>
+
+
+-----------
+
+<br/>
+
+### __3. 상관관계 분석__
+
+#### __1) 양(+)의 상관관계__
+##### __1)-1 직위(JobLevel)와 월급	(MonthlyIncome)	0.9502999	의 양의 상관관계__
+
+```{r}
+
+boxplot( MonthlyIncome ~ JobLevel, data=HR , col=rainbow(5), main="Income by Job level")
+
+```
+
+```
+- 직급이 높아질수록 월급이 많아진다
+- 직급4는 임금의 폭이 크다
+- 직급 1과 2는 특별히 많이 받는 사람들이 존재한다
+- 직급 5는 같은 직급내에선 임금격차가 적다 
+```
+
+##### __1)-2 직급(JobLevel)과 총근속년수(TotalWorkingYears)	0.7822078	의 양의 상관관계__
+
+```{r}
+#1. boxplot
+boxplot( TotalWorkingYears ~ JobLevel, data=HR , col=rainbow(5), main="TotalWorkingYears by Job level")
+```
+
+
+```{r}
+#2. density plot
+library(ggplot2)
+ggplot(HR, aes(x=TotalWorkingYears, colour = JobLevel)) + geom_density(fill = NA) + geom_line(stat = "density") + expand_limits(y = 0) + ggtitle("TotalWorkingYears by Job level")
+
+
+```
+```
+- 직위가 높은 사람들(4,5레벨)이 오래 근무하는 확률이 더 높다 (인과관계여부 x, 상관성)
+- 직위 1,2,3레벨은 10년 미만으로 근무할 확률이 높다. 
+
+```
+* 급여인상비율(PercentSalaryHike)과 성과비율(PerformanceRating) 0.7735500의 양의 상관관계 
+
+```{r}
+boxplot( PercentSalaryHike ~ PerformanceRating, data=HR , col=rainbow(5), main="Performance rating by percent salary hike")
+```
+
+```
+- 성과비율에 따라 급여 인상 비율이 크게 증가한다
+
+```
+
+
+##### __1)-3 결혼상태(MaritalStatus)와 스톡옵션 레벨(StockOptionLevel)	-0.6625773	의 음의 상관관계__
+
+```{r}
+mosaicplot(~ MaritalStatus + StockOptionLevel, data = HR, color = T, main = "StockOptionLevel by MaritalStatus")
+
+```
+
+```
+- 미혼의 스톡옵션 레벨이 낮다
+- 기혼자는 대부분 스톡옵션 레벨이 1이다
+
+```
+
+
+
+##### __1)-4 부서(Department)와 직무	(JobRole)	0.6624312	의 양의 상관관계__
+```{r}
+
+df_data <- HR%>% group_by(JobRole, Department) %>% summarise(total = n())
+df_data.1 <- df_data %>% group_by(Department) %>% mutate(percent = total / sum(total))
+
+```
+
+
+```{r}
+df_data.1
+```
+
+```{r}
+ggplot(df_data.1, aes(x = Department, fill = JobRole)) +
+        geom_bar(position = 'fill') + 
+        scale_fill_brewer() + 
+        xlab("Department") + 
+        ylab("JobRole") + 
+        guides(fill=guide_legend(title="JobRole"))
+
+```
+```
+
+- R&D부서에 가장 다양한 직무가 혼재되어있다. 
+
+```
+
+
+<br/>
+
+--------------------
+
+<br/>
+
+
+### __4. t test__
+
+#### __1) Gender / Monthly Income에 대한 t-test__
+전체 데이터에서 여성은 588명, 남성은 882명이다.
+```{r}
+tapply(HR$MonthlyIncome, HR$Gender, mean)
+```
+분석결과 여성의 월급 평균은 $6686, 남성의 월급 평균은 $6380이다.
+
+
+```{r}
+barplot(tapply(HR$MonthlyIncome, HR$Gender, mean), names.arg = c("여성", "남성"), main = "성별간 월급 평균", col=c("rosybrown", "seagreen"))
+
+#test option
+```
+
+이처럼 평균에 수치적으로 차이가 있는 것을 확인하였으나, 통계적으로 유의미한 차이가 있는지를 알아보기 위해 아래와 같이 t-test를 실시하였다.  
+__귀무가설 H0: 성별에 따라 월급의 차이가 없다.__  
+__대립가설 H1: 성별에 따라 월급의 차이가 있다.__
+
+```{r}
+tdata<-data.frame(HR$Gender, HR$MonthlyIncome)
+t.test(tdata)
+```
+검정결과 p-value 값이 0에 가까운 값이 나왔으며, 유의수준 1%보다 작기에 귀무가설을 기각하고 대립가설을 채택한다.  
+이는 곧 __성별(Gender)에 따라 월급(Monthly Income) 평균에 유의미한 차이가 있다__ 고 결론지을 수 있다.
+
+<br/>
+
+-----------------
+
+<br/>
+
+### __5. One-way ANOVA__
+월급(Monthly Income)이 설명변수에 따라 달라지는지의 여부를 알아보기 위해 출장빈도(BusinessTravel), 부서(Department), 교육필드(EducationField), 결온여부상태(MaritalStatus) 4가지 변수에 대해 각각 ANOVA 분산분석을 실시하였다.
+
+<br/>
+
+#### __1) Monthly Income에 대한 일원분산분석__
+
+##### __1)-1. Monthly Income / Business Travel__
+출장빈도의 정도에 따라 월급의 차이가 있는지를 분석하고자 시도했다. 이때 출장빈도는 [가보지 않음, 가끔, 자주] 3단계로 설정하였다.
+```{r}
+barplot(tapply(HR$MonthlyIncome, HR$BusinessTravel, mean), names.arg=c("가보지 않음", "가끔", "자주"), main="출장빈도에 따른 월급평균", col=c("aliceblue", "aquamarine2", "bisque"))
+```
+그래프를 보면 평균에 차이가 있는 것으로 보인다. 이때 통계적으로도 유의미한 차이가 있는지를 알아보고자 아래와 같이 분산분석을 시행하였다.  
+분산분석을 시행하기 전, 출장빈도에 따른 월급 그룹이 등분산성을 가지는지를 알아보았다.  
+__H0: 그룹 간에 분산은 같다__  
+__H1: 그룹 간에 분산은 같지 않다__
+```{r}
+var.test(HR$BusinessTravel, HR$MonthlyIncome)
+```
+var.test()를 이용하여 분산분석을 시행한 결과, p-value값이 0에 가까운 값을 가지므로, 귀무가설을 기각하고 __그룹 간에 분산이 같지 않다__ 는 대립가설을 채택한다.  
+
+<br/>
+
+등분산성이 없기 때문에 var.equal=F 옵션을 두어 분산분석을 시행하였다.  
+__H0: 출장빈도에 따라 월급에 차이가 없다__  
+__H1: 출장빈도에 따라 월급에 차이가 있다__  
+```{r}
+oneway.test(MonthlyIncome ~ BusinessTravel, data=HR, var.equal = F)
+```
+분석 결과 p-value 값이 0.3012이므로, 유의수준 10% 내에서도 귀무가설을 기각할 수 없다. 따라서 __출장빈도에 따라서 월급에 차이가 없다__ 는 귀무가설을 채택한다.
+
+
+
+<br/>
+
+
+
+##### __1)-2. Monthly Income / Department__
+부서에 따라 월급의 차이가 있는지를 분석하고자 시도했다. 이때 부서는 [HR, R&D, Sales] 3단계로 나뉜다.
+```{r}
+barplot(tapply(HR$MonthlyIncome, HR$Department, mean), names.arg=c("HR", "R&D", "Sales"), main="부서에 따른 월급평균", col=c("aliceblue", "aquamarine2", "bisque"))
+```
+그래프를 보면 평균에 차이가 있는 것으로 보인다. 이때 통계적으로도 유의미한 차이가 있는지를 알아보고자 아래와 같이 분산분석을 시행하였다.  
+분산분석을 시행하기 전, 부서에 따른 월급 그룹이 등분산성을 가지는지를 알아보았다.  
+__H0: 그룹 간에 분산은 같다__  
+__H1: 그룹 간에 분산은 같지 않다__
+```{r}
+var.test(HR$Department, HR$MonthlyIncome)
+```
+var.test()를 이용하여 분산분석을 시행한 결과, p-value값이 0에 가까운 값을 가지므로, 귀무가설을 기각하고 __그룹 간에 분산이 같지 않다__ 는 대립가설을 채택한다.  
+
+<br/>
+
+등분산성이 없기 때문에 var.equal=F 옵션을 두어 분산분석을 시행하였다.  
+__H0: 부서에 따라 월급에 차이가 없다__  
+__H1: 부서에 따라 월급에 차이가 있다__  
+```{r}
+oneway.test(MonthlyIncome ~ Department, data=HR, var.equal = F)
+```
+분석 결과 p-value 값이 0.02662이므로, 유의수준 10% 내에서 귀무가설을 기각할 수 있다. 그러나 유의수준 5%와 유의수준 1% 내에서는 귀무가설을 기각할 수 없다.
+
+
+
+<br/>
+
+
+
+##### __1)-3. Monthly Income / EducationField__
+교육 분야(전공)에 따라 월급의 차이가 있는지를 분석하고자 시도했다. 이때 교육 분야는 [HR, 마케팅, 기술학위, 생태학, 의학, 기타] 로 나뉜다.
+```{r}
+barplot(tapply(HR$MonthlyIncome, HR$EducationField, mean), names.arg=c("HR", "Life Sciences", "Marketing", "Medical", "Other", "Technical Degree"), main="교육분야(전공)에 따른 월급평균", col=c("aliceblue", "aquamarine2", "bisque", "darkorange", "darkred", "deeppink1"))
+```
+그래프를 보면 평균에 차이가 있는 것으로 보인다. 이때 통계적으로도 유의미한 차이가 있는지를 알아보고자 아래와 같이 분산분석을 시행하였다.  
+분산분석을 시행하기 전, 교육분야에 따른 월급 그룹이 등분산성을 가지는지를 알아보았다.  
+__H0: 그룹 간에 분산은 같다__  
+__H1: 그룹 간에 분산은 같지 않다__
+```{r}
+var.test(HR$EducationField, HR$MonthlyIncome)
+```
+var.test()를 이용하여 분산분석을 시행한 결과, p-value값이 0에 가까운 값을 가지므로, 귀무가설을 기각하고 __그룹 간에 분산이 같지 않다__ 는 대립가설을 채택한다.  
+
+<br/>
+
+등분산성이 없기 때문에 var.equal=F 옵션을 두어 분산분석을 시행하였다.  
+__H0: 교육분야에 따라 월급에 차이가 없다__  
+__H1: 교육분야에 따라 월급에 차이가 있다__  
+```{r}
+oneway.test(MonthlyIncome ~ EducationField, data=HR, var.equal = F)
+```
+분석 결과 p-value 값이 0.04331이므로, 유의수준 10%와 5% 내에서 귀무가설을 기각할 수 있다. 그러나 유의수준 1% 내에서는 귀무가설을 기각할 수 없다.
+
+
+
+<br/>
+
+
+
+##### __1)-4. Monthly Income / Marital Status__
+결혼 여부에 따라 월급의 차이가 있는지를 분석하고자 시도했다. 이때 결혼여부는 [싱글, 기혼, 이혼] 3단계로 나뉜다.
+```{r}
+barplot(tapply(HR$MonthlyIncome, HR$Department, mean), names.arg=c("이혼", "결혼", "싱글"), main="결혼여부에 따른 월급평균", col=c("aliceblue", "aquamarine2", "bisque"))
+```
+그래프를 보면 평균에 차이가 있는 것으로 보인다. 이때 통계적으로도 유의미한 차이가 있는지를 알아보고자 아래와 같이 분산분석을 시행하였다.  
+분산분석을 시행하기 전, 부서에 따른 월급 그룹이 등분산성을 가지는지를 알아보았다.  
+__H0: 그룹 간에 분산은 같다__  
+__H1: 그룹 간에 분산은 같지 않다__
+```{r}
+var.test(HR$MaritalStatus, HR$MonthlyIncome)
+```
+var.test()를 이용하여 분산분석을 시행한 결과, p-value값이 0에 가까운 값을 가지므로, 귀무가설을 기각하고 __그룹 간에 분산이 같지 않다__ 는 대립가설을 채택한다.  
+
+<br/>
+
+등분산성이 없기 때문에 var.equal=F 옵션을 두어 분산분석을 시행하였다.  
+__H0: 결혼여부에 따라 월급에 차이가 없다__  
+__H1: 결혼여부에 따라 월급에 차이가 있다__  
+```{r}
+oneway.test(MonthlyIncome ~ MaritalStatus, data=HR, var.equal = F)
+```
+분석 결과 p-value 값이 0.001729이므로, 유의수준 1% 내에서 귀무가설을 기각할 수 있다. 즉, __결혼여부에 따라 월급에 차이가 있다__ 는 대립가설을 채택한다.
+
+
+<br/>
+
+--------------------
+
+<br/>
+
+### __6. 회귀분석__
+#### __필요 라이브러리 호출__
+```{r}
+library(dplyr)
+library(car)
+library(pcr)
+library(pls)
+library(caret)
+library(correlation)
+library(nnet)
+library(neuralnet)
+
+```
+#### __rJava, FSelector 소스 불러오기__
+```{r}
+source("https://install-github.me/talgalili/installr")
+installr::install.java()
+library(rJava)
+library(FSelector)
+```
+
+#### __1) 설명변수 선정과정__
+
+##### __1)-1 전체적으로 파악을 위해 모든 변수를 이용한 회귀분석을 실행__
+```{r}
+m <- lm(HR$MonthlyIncome~., HR)
+summary(m)
+```
+
+분석 결과 __Department, DistanceFromHome, JobLevel, JobRole, TotalWorkingYear, YearsWithCurrManager__ 가 유의한 변수이다.
+
+<br/>
+
+step function으로 변수 유의성을 판단하기 위해 다시 회귀모델을 생성하였다.
+
+##### __1)-2 step function을 이용하여 변수 선택__
+```{r}
+m1_new <- lm(MonthlyIncome~.,HR)
+step_f <- step(m1_new, direction = 'both')
+formula(step_f)
+```
+
+결과: __Department, DistanceFromHome, JobLevel, JobRole, TotalWorkingYears, YearsWithCurrManager__ 가 유의한 설명변수로 판단된다.
+그러나 __AIC 지수가 높아 모델 적합 신뢰도가 높지 않아 주성분 분석__ 을 실시하였다.
+
+<br/>
+
+##### __1)-3 PCA 주성분분석__
+pcr()을 이용하여 설명변수 간의 다중공선성을 제거하고 주요한 주성분들을 통해 회귀분석을 실시하고자 하였다.
+
+##### __pcr 주성분분석 모델 생성__
+```{r}
+pcr_out <- pcr(MonthlyIncome~.,data = HR,validation='LOO', jackknife=T)
+summary(pcr_out)
+```
+확인 결과: __성분 누적 결과 설명도 90% 넘는 Component == 24개__
+
+
+##### __해당 24개 성분으로 회귀분석 모델 생성__
+```{r}
+jack.test(pcr_out, ncomp=24)
+```
+결과: __step() 결과값과 유의한 설명변수가 같은 것으로__ 로 나옴
+
+
+
+##### __ 해당 변수들로 데이터 프레임 재생성__
+```{r}
+new_df <- HR %>% select(MonthlyIncome, 
+                             Department,
+                             DistanceFromHome,
+                             JobLevel,
+                             JobRole,
+                             TotalWorkingYears,
+                             YearsWithCurrManager
+)
+```
+
+
+##### 위에서 __공통적으로 유의하다 판단된 설명변수만으로 다시 주성분 분석__ 및 __잔차 확인__
+```{r}
+pcr_out2 <- pcr(MonthlyIncome~., data = new_df, vailidation='LOO', jackknife=T)
+
+plot(scale(pcr_out2$residuals[,,3]),main='Residual', xlab = 'Index', ylab = 'Residual')
+
+```
+결과: __잔차들이 골고루 퍼져있기에 설명변수들이 괜찮은 것으로 판단__ 하고 선택하였음
+
+
+<br/>
+
+#### __2) 설명변수 검증과정__
+
+##### __2)-1 앞서 선정한 설명변수 간 상관관계(상관계수)가 큰 것을 제거하는 방법으로 검증__
+
+#####  __종속변수를 제거한 새로운 데이터프레임 만들기__
+```{r}
+new_df2 <- new_df[,-1]
+```
+
+##### __상관관계가 존재하는 설명변수 도출__ 
+```{r}
+cor_col <- findCorrelation( cor( new_df2 ))
+length(cor_col)
+```
+결과: __0으로 서로 상관관계가 큰 설명변수는 존재하지 않음__ 을 알 수 있음
+
+
+##### __2)-2 마지막으로 설명변수를 연속형변수와 명목형 변수로 나누어서 검증__
+
+##### __linear.correlation function으로 먼저 연속형 설명 변수들 검증__
+
+```{r}
+# linear attribution 데이터 정의
+la <- HR[,c(1,6,10,13,19,20,24,29,30,32,33,34,35)]
+
+attr_importance_1 <- linear.correlation(MonthlyIncome~., data=la)
+attr_importance_1 <- attr_importance_1 %>% arrange(desc(attr_importance))
+head(attr_importance_1)
+```
+
+##### __rank.correlation function으로 명목형 설명 변수들 검증__
+```{r}
+# MonthlyIncome을 포함한 non_linear attribution 데이터 정의
+nla <- HR[,-c(1,6,10,13,20,24,29,30,32,33,34,35)]
+
+attr_importance_2 <- rank.correlation(MonthlyIncome~Department+JobLevel+JobRole,data = nla)
+attr_importance_2 <- attr_importance_2 %>% arrange(desc(attr_importance))
+attr_importance_2
+```
+
+##### __2)-3 종합 판단 데이터 프레임__
+
+```{r}
+new_data <- HR %>% select(MonthlyIncome, 
+                               Department, 
+                               DistanceFromHome,
+                               JobLevel,
+                               TotalWorkingYears,
+                               YearsWithCurrManager)
+```
+
+
+<br/>
+
+#### __3) 회귀모델 생성 및 검증__
+##### __3)-1 회귀모델 생성__
+
+```{r}
+f_m <- lm(MonthlyIncome~., data = new_data)
+summary(f_m)
+```
+결과: 전체적으로 __p-value 값이 0에 가깝게 나오며, 수정된 결정계수 값이 0.9075로, 모델의 신뢰성이 높은 것으로 나타났다
+
+##### __3)-2 회귀모델 검증 및 시각화__
+```{r}
+par(mfrow=c(2,2))
+plot(f_m)
+```
+데이터 간의 등분산성이 존재하고, Q-Q plot을 보면 정규성이 있다고 판단된다.
+
+```{r}
+## fitted function 이용해 전체의 추정값 도출, 실제값 도출 
+y_hat <- fitted(f_m)
+
+## 실제값 
+y <- new_data[['MonthlyIncome']]
+```
+
+```{r}
+# 추정값 vs 실제값 그래프 
+scatter.smooth(y_hat,y, main='추정값 vs 실제값', xlab='추정값', ylab='실제값')
+```
+
+<br/>
+
+#### __4) 인공신경망과 회귀모델 비교__
+##### __4)-1 실제값과 인공신경망 예측치와 비교__
+```{r}
+## 인공신경망 모델 만들기 size =5
+ai <- nnet(MonthlyIncome~., data = new_data, size = 5, decay=0.1, linout=T)
+
+## 인공신경망 모델로 예측값 생성
+ai_pred <- predict(ai, newdata = new_data)
+
+## 인공 신경망과 실제값 비교
+scatter.smooth(ai_pred, y)
+```
+
+
+##### __4)-2 인공신경망 모델 vs 회귀 모델__
+
+```{r}
+## 실제 값, 인공신경망 모델, 회귀 모델로 데이터 프레임 만들기
+model_cpr <- data.frame(real_val = y, ai_val=ai_pred[,1], lr_val = y_hat)
+
+## 실제 값과 각 모델의 잔차를 절대값으로 계산
+cpr <- data.frame(ai_val = abs(model_cpr[,1]- model_cpr[,2]), lr_val = abs(model_cpr[,1] - model_cpr[,3]))
+
+## 인공신경망 추정값의 잔차가 더 클 경우 0, 작을 경우 1 부여
+cpr_2 <- ifelse(cpr[,1] >=cpr[,2], 0 , 1)
+
+
+## 총 개수 리턴
+cpr <- cbind(cpr,cpr_2)
+cpr_count <- cpr %>% group_by(cpr_2) %>% summarise(count = n())
+cpr_count
+```
+
+###### 0 == 인공신경망 모델의 잔차가 더 큰경우 / 1 == 회귀 모델의 잔차가 더 큰경우
+
+
+
+<br/>
+
+--------------------
+
+<br/>
+
+### __7. Classification__
+이항 로지스틱 회귀분석, Support Vector Machine, 다항 로지스틱 회귀분석, 인공신경망 총 4가지 분류모델을 만들어 예측 및 모델평가를 수행하였다.  
+
+<br/>
+
+#### __1) 로지스틱 회귀분석 __
+종속변수를 Attrition으로 두고, 설명변수에 따라서 직장을 그만둘지 그만두지 않을지를 예측할 수 있는 모델을 수립해보고자 한다.  
+
+##### __1)-1 데이터 전처리__
+```{r}
+# (1) 의미 없는 칼럼 지우기
+HR1<-read.csv(path, stringsAsFactors = T)
+HR1<-(HR1[,-c(9,10,22,27)])
+```
+직원 index 및 단일한 값만이 들어가 있어 분석에 의미가 없는 칼럼을 제거하였다(EmployeeCount, EmployeeNumber, Over18, StandardHours).  
+
+<br/>
+
+```{r}
+# (2) factor형 변수 numeric으로 바꾸기
+HR1$BusinessTravel <- as.numeric(HR1$BusinessTravel)
+HR1$Department <- as.numeric(HR1$Department)
+HR1$EducationField <- as.numeric(HR1$EducationField)
+HR1$EnvironmentSatisfaction  <- as.numeric(HR1$EnvironmentSatisfaction)
+HR1$Gender<- as.numeric(HR1$Gender)
+HR1$JobRole<- as.numeric(HR1$JobRole)
+HR1$MaritalStatus <- as.numeric(HR1$MaritalStatus)
+HR1$OverTime<- as.numeric(HR1$OverTime)
+
+HR1$Attrition <- ifelse(HR1$Attrition == "Yes", 1, 0)
+```
+로지스틱 회귀모델은 결과값이 확률(0~1 사이의 값)로 나오므로, 종속변수의 두 class를 1(Yes), 0(No)로 바꿔준다.
+
+<br/>
+
+##### __1)-2 Creating training and test dataset (7:3)__
+```{r}
+library(caret)
+
+set.seed(46)
+intrain<-createDataPartition(y=HR1$Attrition, p=0.7, list=F) #test dataset 70%, train dataset 30%
+train<-HR1[intrain,]
+test<-HR1[-intrain,]
+```
+
+<br/>
+
+##### __1)-3 로지스틱 회귀모델 수립__
+```{r}
+(gHR<-glm(Attrition~., data=train, family = "binomial"))
+
+head(fitted(gHR))
+summary(gHR)
+```
+
+<br/>
+
+##### __1)-4 test dataset으로 모델 예측 및 정확도 평가__
+```{r}
+predictHR <- predict(gHR, newdata = test, type="response")
+predictHR<- round(predictHR)
+THR <- table(test$Attrition, predictHR)
+
+# 정분류율
+sum(THR[row(THR) == col(THR)])/sum(THR) # 약 86.6%의 정확도를 보여준다.
+
+# 오분류율
+1-sum(THR[row(THR) == col(THR)])/sum(THR) # 약 13.4%의 오류를 보여준다.
+```
+
+<br/>
+
+#####  __1)-5 ROC Curve__
+```{r}
+library(ROCR)
+pr <- prediction(predictHR, test$Attrition)
+prf <- performance(pr, measure = "tpr", x.measure = "fpr")
+plot(prf)
+
+auc <- performance(pr, measure = "auc")
+auc <- auc@y.values[[1]]
+auc 
+```
+
+<br/>
+<br/>
+
+#### __2) Support Vector Machine (SVM)__
+종속변수를 Attrition으로 두고, 설명변수에 따라서 직장을 그만둘지 그만두지 않을지를 예측할 수 있는 모델을 수립해보고자 한다. 
+
+##### __2)-1 데이터 전처리__
+```{r}
+# (1) 의미 없는 칼럼 지우기
+HR1<-read.csv(path, stringsAsFactors = T)
+HR1<-(HR1[,-c(9,10,22,27)])
+
+# (2) factor형 변수 numeric으로 바꾸기
+HR1$BusinessTravel <- as.numeric(HR1$BusinessTravel)
+HR1$Department <- as.numeric(HR1$Department)
+HR1$EducationField <- as.numeric(HR1$EducationField)
+HR1$EnvironmentSatisfaction  <- as.numeric(HR1$EnvironmentSatisfaction)
+HR1$Gender<- as.numeric(HR1$Gender)
+HR1$JobRole<- as.numeric(HR1$JobRole)
+HR1$MaritalStatus <- as.numeric(HR1$MaritalStatus)
+HR1$OverTime<- as.numeric(HR1$OverTime)
+```
+
+<br/>
+
+##### __2)-2 Creating training and test dataset (7:3)__
+```{r}
+library(caret)
+set.seed(46)
+intrain<-createDataPartition(y=HR1$Attrition, p=0.7, list=F) #test dataset 70%, train dataset 30%
+train<-HR1[intrain,]
+test<-HR1[-intrain,]
+```
+
+<br/>
+
+##### __2)-3 Creating SVM Classification Model__
+```{r}
+library(e1071)
+sHR <- svm(Attrition ~., data=train)
+summary(sHR)
+```
+
+<br/>
+
+##### __2)-4 test dataset으로 모델 예측 및 정확도 평가__
+```{r}
+svmhr <- predict(sHR, test)
+STHR <- table(real=test$Attrition, predict=svmhr)
+# STHR 규모가 너무 커서 실제로 output 출력하지 말 것
+
+# 정분류율
+(STHR[1,1]+STHR[2,2]) / sum(STHR) # 85.9%
+
+# 오분류율
+1-(STHR[1,1]+STHR[2,2]) / sum(STHR) # 14.1%
+```
+
+<br/>
+
+#### __3) 다항 로지스틱 회귀분석__
+설명변수에 대해서 Department를 예측해보고자 다항 로지스틱 회귀분석 모델을 구축해보았다.
+
+<br/>
+
+##### __3)-1 데이터 전처리__
+```{r}
+# (1) 의미 없는 칼럼 지우기
+HR1<-read.csv(path, stringsAsFactors = T)
+HR1<-(HR1[,-c(9,10,22,27)])
+
+# (2) factor형 변수 numeric으로 바꾸기
+HR1$BusinessTravel <- as.numeric(HR1$BusinessTravel)
+HR1$Department <- as.numeric(HR1$Department)
+HR1$EducationField <- as.numeric(HR1$EducationField)
+HR1$EnvironmentSatisfaction  <- as.numeric(HR1$EnvironmentSatisfaction)
+HR1$Gender<- as.numeric(HR1$Gender)
+HR1$JobRole<- as.numeric(HR1$JobRole)
+HR1$MaritalStatus <- as.numeric(HR1$MaritalStatus)
+HR1$OverTime<- as.numeric(HR1$OverTime)
+```
+
+<br/>
+
+##### __3)-2 Creating training and test dataset (7:3)__
+```{r}
+library(caret)
+set.seed(46)
+intrain<-createDataPartition(y=HR1$Department, p=0.7, list=F) #test dataset 70%, train dataset 30%
+train<-HR1[intrain,]
+test<-HR1[-intrain,]
+```
+
+<br/>
+
+##### __3)-3 다항 로지스틱 회귀모델 수립__
+```{r}
+library(nnet)
+(mHR<-multinom(Department~., data=train))
+head(fitted(mHR))
+```
+
+<br/>
+
+##### __3)-4 test dataset으로 모델 예측 및 정확도 평가__
+```{r}
+mpHR<-predict(mHR, newdata=test, type="probs")
+head(mpHR)
+predictions <- apply(mpHR, 1, which.max)
+
+(t <- table(test$Department, predictions))
+
+# 정분류율
+sum(t[row(t)==col(t)]) / sum(t) # 87%
+ 
+# 오분류율
+1-sum(t[row(t)==col(t)]) / sum(t) # 13%
+```
+
+
+<br/>
+
+#### __4) 인공신경망 분석__
+설명변수에 따라서 JobRole을 예측해보고자 인공신경망 모델을 구축해보았다.
+
+<br/>
+
+##### __4)-1 데이터 전처리(정규화)__
+```{r}
+# (1) 의미 없는 칼럼 지우기
+HR1<-read.csv(path, stringsAsFactors = T)
+HR1<-(HR1[,-c(9,10,22,27)])
+
+# (2) factor형 변수 numeric으로 바꾸기
+HR1$BusinessTravel <- as.numeric(HR1$BusinessTravel)
+HR1$Department <- as.numeric(HR1$Department)
+HR1$EducationField <- as.numeric(HR1$EducationField)
+HR1$EnvironmentSatisfaction  <- as.numeric(HR1$EnvironmentSatisfaction)
+HR1$Gender<- as.numeric(HR1$Gender)
+HR1$JobRole<- as.numeric(HR1$JobRole)
+HR1$MaritalStatus <- as.numeric(HR1$MaritalStatus)
+HR1$OverTime<- as.numeric(HR1$OverTime)
+HR1$Attrition <- ifelse(HR1$Attrition == "Yes", 1, 0)
+
+# 데이터 정규화
+library(neuralnet)
+normalize<-function(x){
+  return((x-min(x))/(max(x)-min(x)))
+}
+HR1_norm<-as.data.frame(lapply(HR1, normalize))
+summary(HR1_norm)
+```
+
+<br/>
+
+##### __4)-2 train, test dataset 나누기(7:3)__
+
+```{r}
+# 훈련 테스트 나누기
+library(caret)
+set.seed(46)
+intrain<-createDataPartition(y=HR1_norm$JobRole, p=0.7, list=F) #test dataset 70%, train dataset 30%
+H_train<-HR1_norm[intrain,]
+H_test<-HR1_norm[-intrain,]
+
+HR_model<-neuralnet(formula=JobRole~., data=H_train, hidden=1)
+```
+
+<br/>
+
+##### __4)-3 망 시각화 및 신경망 모델 평가__
+
+```{r}
+
+# 망 시각화
+plot(HR_model)
+
+
+#망 예측
+model_results<-compute(HR_model, H_test[,-14])
+str(model_results)
+
+# 평가
+pre_str <- model_results$net.result
+cor(pre_str, H_test$JobRole)
+
+# RMSE
+diff <- function(x,y){
+  (x-y)^2
+}
+d <- diff(pre_str, H_test$JobRole)
+RMSE <- (sum(d)/length(d)^(1/2))
+RMSE
+```
+분석 결과 상관계수 값은 0.74로 일정 수준 이상의 상관성을 가지는 것으로 나타났으며, RMSE 값은 0.9168로 나왔다.
+
+
+
+
+
+
+
+
+
+
+
